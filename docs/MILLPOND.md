@@ -1,6 +1,6 @@
 # The Millpond
 
-Eight public plots, **H3, H4, H5, H6, I3, I4, I5, I6**, form one long pond south of the Meadow Ground. The internal streets are removed, while the perimeter roads remain connected and keep all their lamps. These eight plots are excluded from the builder and contribution validation, which leaves 141 house plots.
+Eight public plots, **H3, H4, H5, H6, I3, I4, I5, I6**, form one long pond south of the Meadow Ground. The internal streets are removed, while the perimeter roads remain connected and keep all their lamps. These eight plots are excluded from the builder and contribution validation, which, with the town's other public plots, leaves 230 house plots.
 
 A stone-footed watermill stands on the south-west bank, its wheel turning in a small bay. A wooden jetty runs out from the south shore, reeds grow thick in the east cove, and a worn path follows the south bank from a gate on the south road. Further east along that road, near the south-east corner, a small timber plaque on two short posts reads "The Millpond". The mill's windows stay dark: nobody lives there. Its wheel turns once every six town minutes, six real seconds, whenever the water is open. Open `#venue=millpond`, or click the water, the mill or the gate sign. The camera fits the pond beside the desktop panel or above the mobile panel, and the panel says what the water is doing now: the ice and skating times, the rowboats, the heron, the fisher, rising fish, and whatever the season has left on the water.
 
@@ -78,7 +78,7 @@ Measured with the recording context in the opening view at 1440 × 900 (camera 7
 - Against the same date and minute in summer, the pond swings by −210 to +66 calls. At night, counting the reed fireflies too, it never falls below −139.
 - The largest parts are the mill, wheel and sign at 198 (106, 60 and 32; the sign's lettering is painted once), the reeds at 154 and the boats with their rowers at 145. The scenery skaters take 79, the fisher 43, the heron 41, the jetty posts 12 and a leaping fish 7.
 - The ground lives in the ground cache and reads only `night` and the season's whole day, so it repaints at most once per town day, like the farm. The terrain loop, the trees and the plot art skip the site.
-- A whole opening-view frame stays between about 31,000 and 33,500 calls at several times of day across the year (31,497–33,461 with the Treeline). Against the same date and minute in summer, the whole frame differs by −754 to +287 calls.
+- A whole opening-view frame stays between about 30,000 and 32,000 calls at several times of day across the year (29,974–31,913 with the Treeline). Against the same date and minute in summer, the whole frame differs by −731 to +322 calls.
 
 ## Code and verification
 

@@ -326,6 +326,9 @@
         position: relative;
         height: 22px;
       }
+      .lane.bandstand {
+        height: 14px;
+      }
       .lane.tunes {
         height: 56px;
       }
@@ -370,6 +373,13 @@
       }
       .lane.stage .mark {
         font-size: 12px;
+      }
+      .lane.bandstand .mark {
+        background: repeating-linear-gradient(
+          135deg,
+          var(--cover) 0 6px,
+          color-mix(in srgb, var(--cover) 55%, white) 6px 10px
+        );
       }
       .playhead {
         position: absolute;
@@ -443,6 +453,9 @@
       }
       .swatch.stage {
         background: #9b7ca8;
+      }
+      .swatch.bandstand {
+        background: repeating-linear-gradient(135deg, #b8925a 0 4px, #e3d4bb 4px 7px);
       }
       .swatch.now {
         width: 0;
@@ -976,9 +989,10 @@
           <span id="count-tunes">11</span> tunes for the hours of the day (<span id="count-new"
             >9</span
           >
-          of them new) and the stage's <span id="count-shows">4</span> shows. Every note is written
-          in code and played by a little synthesizer in your browser. Pick a record, tune in to the
-          town, or let the whole day play.
+          of them new), the stage's <span id="count-shows">4</span> shows and the Bandstand's
+          <span id="count-bands">3</span> bands. Every note is written in code and played by a
+          little synthesizer in your browser. Pick a record, tune in to the town, or let the whole
+          day play.
         </p>
       </header>
 
@@ -1006,6 +1020,7 @@
           <p class="next">
             <span id="on-air-next"></span> <span class="countdown" id="on-air-countdown"></span>
           </p>
+          <p class="muted" id="on-air-band" hidden></p>
           <div class="row" style="margin-top: 14px">
             <button type="button" id="tune-in" aria-pressed="false">Tune in</button>
             <span class="handoff" id="on-air-handoff" hidden
@@ -1020,8 +1035,8 @@
         <h2 id="day-title">A day of Forktown FM</h2>
         <p class="lede">
           Each stretch of the day has a tune of its own, and each tune hands over to the next at the
-          end of a four-bar phrase. The stage's shows play over them. Click any part of the day to
-          hear it.
+          end of a four-bar phrase. The stage's shows play over them, and a Bandstand set is heard
+          only near the stand. Click any part of the day to hear it.
         </p>
         <div class="timeline">
           <div class="lanes">
@@ -1030,6 +1045,12 @@
               id="lane-stage"
               role="group"
               aria-label="The Little Stage"
+            ></div>
+            <div
+              class="lane bandstand"
+              id="lane-bandstand"
+              role="group"
+              aria-label="The Bandstand, heard only near the stand"
             ></div>
             <div
               class="lane tunes"
@@ -1048,6 +1069,7 @@
           <li>
             <span class="swatch stage"></span>The Little Stage: the concert and the midnight party
           </li>
+          <li><span class="swatch bandstand"></span>The Bandstand's sets</li>
           <li><span class="swatch"></span>The town's tune for each stretch of the day</li>
           <li><span class="swatch now"></span>The town's real time</li>
         </ul>
@@ -1136,8 +1158,9 @@
         <p>
           Every loop is synthesized here, in your browser, from the notes in src/music: no
           recordings, no samples, nothing downloaded. In town the music follows the clock, the
-          evening concert and the midnight party play over the tune of the hour. This room is in the
-          development build only and never changes the town's clock.
+          evening concert and the midnight party play over the tune of the hour, and a Bandstand set
+          is heard only near the stand. This room is in the development build only and never changes
+          the town's clock.
         </p>
         <p><a href="/">Back to the town →</a></p>
       </footer>
@@ -1167,6 +1190,7 @@
         TOWN_ROTATION,
         TRACKS,
         durationOf,
+        isBandTrack,
         isTownTune,
         townTuneAt,
         trackForTown,
@@ -1187,6 +1211,9 @@
         acoustic: ['#c2a56f', '♬'],
         jazz: ['#798784', '♪'],
         party: ['#9b7ca8', '✦'],
+        brass: ['#b8925a', '♩'],
+        folk: ['#7f9a6a', '♭'],
+        strings: ['#8a6f7f', '♯'],
         smallhours: ['#4f5a78', '✧'],
         beforedawn: ['#5f7e9c', '◓'],
         sunrise: ['#cf9468', '☼'],
@@ -1302,6 +1329,11 @@
           blurb: 'The Little Stage: one evening concert a night, then the midnight party.',
           tracks: STAGE_SHOWS.filter((track) => track in TRACKS),
         },
+        {
+          title: 'The Bandstand',
+          blurb: 'Heard only near the stand by the river, during its teatime and sundown sets.',
+          tracks: Object.keys(TRACKS).filter(isBandTrack),
+        },
       ];
       const shelved = new Set(GROUPS.flatMap((group) => group.tracks));
       const unshelved = Object.keys(TRACKS).filter((track) => !shelved.has(track));
@@ -1323,9 +1355,11 @@
         }
         return events;
       }
-      /** What the town plays at a minute of a day. */
+      /** What the town plays at a minute of a day, away from the Bandstand. */
       const townTrack = (day, minutes) => trackForTown(wrap(minutes), eventsAt(day, minutes));
       const isStage = (event) => event.venue.kind === 'stage';
+      const isBandstandSet = (event) =>
+        event.outing === 'bandstand-tea' || event.outing === 'bandstand-sundown';
       /**
        * The next time the music changes after `minutes`, minute by minute for up to a day.
        * `rollsOver` moves to the next day at midnight (the real clock); a pretend day stays put.
@@ -1347,13 +1381,17 @@
         if (show) return `${show.name}, ${eventSpan(show)}`;
         return isTownTune(track) ? `the tune for ${span(slotAt(minutes))}` : '';
       }
-      /** The stage shows of a day, as pieces of the 24-hour bar. */
+      /** The stage shows and Bandstand sets of a day, as pieces of the 24-hour bar. */
       function marksOf(events) {
         const marks = [];
         for (const event of events) {
-          if (!isStage(event)) continue;
-          const lane = 'stage';
-          const track = trackForTown(event.start, events);
+          const lane = isStage(event) ? 'stage' : isBandstandSet(event) ? 'bandstand' : undefined;
+          if (!lane) continue;
+          const track =
+            lane === 'stage'
+              ? trackForTown(event.start, events)
+              : trackForTown(event.start, events, { gain: 1 });
+          if (lane === 'bandstand' && !isBandTrack(track)) continue;
           // The midnight party runs past 24:00: its last part is drawn from 00:00.
           const pieces =
             event.end > DAY
@@ -1371,6 +1409,14 @@
       /** A record's place in the day for its card, and a badge when it is on today. */
       function whenOf(track, events) {
         if (isTownTune(track)) return { text: stretchesOf(track).map(span).join(' · ') };
+        if (isBandTrack(track)) {
+          const sets = events.filter(isBandstandSet);
+          const today = sets.some((set) => trackForTown(set.start, events, { gain: 1 }) === track);
+          return {
+            text: `Bandstand · ${sets.map(eventSpan).join(', ')}`,
+            badge: today && 'Today',
+          };
+        }
         const shows = events.filter(isStage);
         const tonight = shows.find((show) => trackForTown(show.start, events) === track);
         const concert = shows.find((show) => show.period === 'evening');
@@ -1393,9 +1439,11 @@
         onAirWhy: $('#on-air-why'),
         onAirNext: $('#on-air-next'),
         onAirCountdown: $('#on-air-countdown'),
+        onAirBand: $('#on-air-band'),
         onAirHandoff: $('#on-air-handoff'),
         tuneIn: $('#tune-in'),
         laneStage: $('#lane-stage'),
+        laneBandstand: $('#lane-bandstand'),
         laneTunes: $('#lane-tunes'),
         playhead: $('#playhead'),
         playheadTime: $('#playhead-time'),
@@ -1473,7 +1521,7 @@
         paint();
         try {
           if (!document.hidden) await player.resume();
-          await player.play(track, handoff);
+          await player.play(track, undefined, handoff);
         } catch (error) {
           if (ticket === request)
             stopAll(`Could not play ${titleOf(track)}: ${error?.message ?? error}`);
@@ -1586,6 +1634,8 @@
       }
       /** Plays a part of the day from the timeline, and moves the playhead there. */
       function playAt(minutes, track) {
+        // A band is heard only near its stand: fast-forward would leave it at once.
+        if (isBandTrack(track)) setSpeed(0);
         state.follow = false;
         state.playhead = minutes;
         tuneTo(track, state.speed ? 'fast' : 'day');
@@ -1654,6 +1704,7 @@
       setText($('#count-tunes'), String(ALBUM.length));
       setText($('#count-new'), String(Object.keys(TOWN_TUNES).length));
       setText($('#count-shows'), String(GROUPS[2].tracks.length));
+      setText($('#count-bands'), String(GROUPS[3].tracks.length));
 
       let hinting = false;
       /** Describes what a hovered or focused part of the day is; with no text, the playhead. */
@@ -1715,11 +1766,14 @@
         ),
       );
 
-      /** The stage's lane, and the cards' "today" lines: once a town day. */
+      /** The stage's and the Bandstand's lanes, and the cards' "today" lines: once a town day. */
       function paintDay(day) {
         const events = eventsAt(day, 720);
         const marks = marksOf(events);
-        for (const [lane, node] of [['stage', ui.laneStage]])
+        for (const [lane, node] of [
+          ['stage', ui.laneStage],
+          ['bandstand', ui.laneBandstand],
+        ])
           node.replaceChildren(
             ...marks
               .filter((mark) => mark.lane === lane)
@@ -1736,10 +1790,10 @@
                     tabindex: mark.continued && '-1',
                     onclick: () => playAt(mark.from, mark.track),
                     ...hints(
-                      `${mark.event.name}, ${eventSpan(mark.event)} · ${titleOf(mark.track)}. Click to play it.`,
+                      `${mark.event.name}, ${eventSpan(mark.event)} · ${titleOf(mark.track)}${lane === 'bandstand' ? ', heard only near the stand' : ''}. Click to play it.`,
                     ),
                   },
-                  el('span', { 'aria-hidden': 'true' }, coverOf(mark.track)[1]),
+                  lane === 'stage' && el('span', { 'aria-hidden': 'true' }, coverOf(mark.track)[1]),
                 ),
               ),
           );
@@ -1905,6 +1959,13 @@
         const next = nextOnAir(real);
         setText(ui.onAirNext, next ? `Next at ${hhmm(next.at)}: ${titleOf(next.track)}` : '');
         setText(ui.onAirCountdown, next ? `in ${mss(next.in)}` : '');
+        // A Bandstand set plays over the town's tune, but only near the stand.
+        const band = trackForTown(wrap(real.minutes), eventsAt(real.day, real.minutes), {
+          gain: 1,
+        });
+        ui.onAirBand.hidden = !isBandTrack(band);
+        if (isBandTrack(band))
+          setText(ui.onAirBand, `By the Bandstand: ${titleOf(band)}, heard only near the stand.`);
         ui.tuneIn.setAttribute('aria-pressed', String(state.mode === 'radio'));
         ui.onAirHandoff.hidden = !(state.mode === 'radio' && state.waiting);
         for (const [id, card] of cards) card.onAir.hidden = id !== track;

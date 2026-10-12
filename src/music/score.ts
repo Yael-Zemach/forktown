@@ -1,9 +1,15 @@
 import { isEventLive, type TownEvent } from '../lib/events';
+import { BANDS, type Band } from '../lib/district-calendar';
+import { BAND_COPY } from '../lib/district-copy';
+import { BANDSTAND_TRACKS, composeBandstand } from './bandstand-tracks';
 import type { Instrument } from './instruments';
 import { composeTune, isTune, TOWN_TUNES, type TuneId } from './tunes';
 
-/** The town's own tunes (the day and night theme and the tunes of each hour, tunes/) and the stage's shows. */
-export type TrackId = 'town' | 'night' | 'rock' | 'acoustic' | 'jazz' | 'party' | TuneId;
+/**
+ * The town's own tunes (the day and night theme and the tunes of each hour, tunes/), the stage's
+ * shows, and the Bandstand's three bands (bandstand-tracks.ts).
+ */
+export type TrackId = 'town' | 'night' | 'rock' | 'acoustic' | 'jazz' | 'party' | Band | TuneId;
 export type Voice = 'bell' | 'keys' | 'pluck' | 'lead' | 'pad' | 'bass' | 'kick' | 'snare' | 'hat';
 export type Note = {
   beat: number;
@@ -72,6 +78,7 @@ export const TRACKS: Record<TrackId, TrackInfo> = {
     bpm: 112,
     instruments: 'Plucked lead, offbeat keys, octave bass, four-on-the-floor kick',
   },
+  ...BANDSTAND_TRACKS,
   ...TOWN_TUNES,
 };
 export const BEATS = 64;
@@ -80,10 +87,13 @@ export const beatsOf = (track: TrackId) => TRACKS[track].beats ?? BEATS;
 export const durationOf = (track: TrackId) => (beatsOf(track) * 60) / TRACKS[track].bpm;
 /** Seconds in a phrase of four bars: where one of the town's tunes hands over to the next. */
 export const phraseOf = (track: TrackId) => (4 * (TRACKS[track].bar ?? 4) * 60) / TRACKS[track].bpm;
+/** Whether a track is one of the Bandstand's bands, heard only near it and scaled by its gain. */
+export const isBandTrack = (track: TrackId): track is Band =>
+  (BANDS as readonly string[]).includes(track);
 /**
  * The town's own tunes through the day, in town minutes (one is a real second): each plays from
  * its `from` until the next one's. The midnight party (23:30–02:30) and the evening concert
- * (19:00–21:00) play over them; see trackForTown.
+ * (19:00–21:00) play over them, and a Bandstand set near the stand; see trackForTown.
  */
 export const TOWN_ROTATION: readonly { from: number; track: TrackId }[] = [
   { from: 0, track: 'night' },
@@ -109,13 +119,28 @@ export function townTuneAt(minutes: number): TrackId {
   return track;
 }
 /**
- * What the town plays: a live show on the stage first (the concert, the disco), then the town's
- * own tune for the hour (townTuneAt).
+ * What the town plays: a live show on the stage first (the concert, the disco); then a live
+ * Bandstand set, only while the Bandstand is heard (`bandstand.gain` ≥ 0.005, local like the
+ * cinema); then the town's own tune for the hour (townTuneAt).
  */
-export function trackForTown(minutes: number, events: TownEvent[]): TrackId {
+export function trackForTown(
+  minutes: number,
+  events: TownEvent[],
+  bandstand: { gain: number } = { gain: 0 },
+): TrackId {
   const show = events.find((event) => event.venue.kind === 'stage' && isEventLive(event, minutes));
   if (show?.id === 'night-party') return 'party';
   if (show && (show.id === 'rock' || show.id === 'acoustic' || show.id === 'jazz')) return show.id;
+  if (bandstand.gain >= 0.005) {
+    const set = events.find(
+      (event) =>
+        (event.outing === 'bandstand-tea' || event.outing === 'bandstand-sundown') &&
+        isEventLive(event, minutes),
+    );
+    // Both sets play the day's band, named in the set's own title.
+    const band = set && BANDS.find((band) => BAND_COPY[band].name === set.name);
+    if (band) return band;
+  }
   return townTuneAt(minutes);
 }
 
@@ -409,6 +434,8 @@ const harmony = [
 ];
 
 export function compose(track: TrackId): Note[] {
+  // A band plays its own arrangement; until it has one, today's acoustic notes.
+  if (isBandTrack(track)) return composeBandstand(track) ?? compose('acoustic');
   if (isTune(track)) return composeTune(track);
   const notes: Note[] = [];
   const add = (

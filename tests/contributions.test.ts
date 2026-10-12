@@ -1,7 +1,8 @@
 import { ZOO_PLOTS } from '../src/lib/zoo';
 import { FARM_PLOTS } from '../src/lib/farm';
 import { MILLPOND_PLOTS } from '../src/lib/millpond';
-import { TUBE_PLOTS } from '../src/lib/tubes';
+import { TUBE_HALT_PLOTS } from '../src/lib/tubes';
+import { MARKET_PLOTS } from '../src/lib/district-places';
 import { describe, expect, it } from 'vitest';
 import {
   draftSchema,
@@ -63,7 +64,55 @@ describe('The contribution contract', () => {
     expect(errors).toHaveLength(3);
     expect(errors.join('\n')).toContain('without the @');
     expect(errors.join('\n')).toContain('six-digit hex color');
-    expect(errors.join('\n')).toContain('existing plot from the town map');
+    expect(errors.join('\n')).toContain('Plot "Z99" is not on the town map.');
+  });
+  it('names the public place on a plot no house may take, and open plots near it', () => {
+    // A town of its own, so the suggestions hold however the real one grows.
+    const errors = (plot: string) =>
+      validatePlaces([
+        { file: 'tiny-library.json', data: sample },
+        { file: 'barley-house.json', data: { ...sample, id: 'barley-house', plot } },
+      ]).errors;
+    expect(errors('R1')).toEqual([
+      'barley-house.json → plot: Plot R1 is reserved for Barley Halt on the Treeline, a public place. Pick an open plot such as Q1, R2 or S1.',
+    ]);
+    expect(errors('D7')).toEqual([
+      'barley-house.json → plot: Plot D7 is reserved for the Starlight Cinema, a public place. Pick an open plot such as C7, D8 or C6.',
+    ]);
+    // Every plot that is no house plot names what stands there, in one sentence of its own.
+    const houses = new Set(HOUSE_PLOTS.map((plot) => plot.id));
+    for (const plot of PLOTS.filter((plot) => !houses.has(plot.id))) {
+      const [error, ...more] = errors(plot.id);
+      expect(more, plot.id).toEqual([]);
+      expect(error, plot.id).toMatch(
+        new RegExp(
+          `^barley-house\\.json → plot: Plot ${plot.id} is reserved for [^.]+, a public place\\. Pick an open plot such as [A-T]\\d+, [A-T]\\d+ or [A-T]\\d+\\.$`,
+        ),
+      );
+      expect(error, plot.id).not.toMatch(/undefined|The /);
+    }
+  });
+  it('says how plots are named when a plot is not on the map', () => {
+    const errors = (plot: string) =>
+      validatePlaces([{ file: 'tiny-library.json', data: { ...sample, plot } }]).errors;
+    const map =
+      'is not on the town map. Plots are a row letter from A to T and a column number from 1 to 15, like A1 or T15.';
+    expect(errors('r2')).toEqual([`tiny-library.json → plot: Plot "r2" ${map} Did you mean R2?`]);
+    expect(errors('C16')).toEqual([`tiny-library.json → plot: Plot "C16" ${map}`]);
+    expect(errors('U1')).toEqual([`tiny-library.json → plot: Plot "U1" ${map}`]);
+  });
+  it('says the town needs to grow when a public plot has no open plot near it', () => {
+    const town = HOUSE_PLOTS.map((plot) => {
+      const id = `home-${plot.id.toLowerCase()}`;
+      return { file: `${id}.json`, data: { ...sample, id, plot: plot.id } };
+    });
+    const { errors } = validatePlaces([
+      ...town,
+      { file: 'barley-house.json', data: { ...sample, id: 'barley-house', plot: 'R1' } },
+    ]);
+    expect(errors).toEqual([
+      `barley-house.json → plot: Plot R1 is reserved for Barley Halt on the Treeline, a public place. ${OPEN_PLOTS_COPY.full}`,
+    ]);
   });
   it('rejects duplicate plot claims, naming both files and open plots nearby', () => {
     const { errors } = validatePlaces([
@@ -209,7 +258,7 @@ describe('The open plots a plot clash suggests', () => {
 });
 
 describe('The world stays predictable as people contribute', () => {
-  it('has unique plots with public venues, football ground, cinema, zoo, farm, millpond, and tube stations reserved', () => {
+  it('has unique plots with public venues, football ground, cinema, zoo, farm, millpond, the Riverside and tube halts reserved', () => {
     expect(new Set(PLOTS.map((plot) => plot.id)).size).toBe(PLOTS.length);
     for (const plot of PLOTS)
       expect(placeSchema.safeParse({ ...sample, plot: plot.id }).success).toBe(
@@ -222,9 +271,18 @@ describe('The world stays predictable as people contribute', () => {
           ...ZOO_PLOTS,
           ...FARM_PLOTS,
           ...MILLPOND_PLOTS,
-          ...TUBE_PLOTS,
+          ...TUBE_HALT_PLOTS,
+          ...MARKET_PLOTS,
+          'J15',
+          'K15',
         ].includes(plot.id),
       );
+  });
+  it('offers newcomers exactly the plots the house check accepts', () => {
+    const accepted = PLOTS.filter(
+      (plot) => placeSchema.safeParse({ ...sample, plot: plot.id }).success,
+    );
+    expect(HOUSE_PLOTS.map((plot) => plot.id)).toEqual(accepted.map((plot) => plot.id));
   });
   it('keeps the same coordinates for an existing plot regardless of other places', () => {
     expect(getPlot('B2')).toEqual({ id: 'B2', col: 1, row: 1, x: 7, y: 7 });
@@ -251,6 +309,24 @@ describe('Place files on disk', () => {
       expect(await read(root)).toEqual({
         files: 1,
         entries: [{ file: 'tiny-library.json', data: sample }],
+        errors: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reads a house saved as UTF-8 with a byte-order mark, as some Windows editors save it', async () => {
+    const root = await folder();
+    try {
+      const house = { ...sample, id: 'bom-house', plot: 'A3' };
+      await writeFile(join(root, 'places', 'bom-house.json'), `\uFEFF${JSON.stringify(house)}`);
+      expect(await read(root)).toEqual({
+        files: 2,
+        entries: [
+          { file: 'bom-house.json', data: house },
+          { file: 'tiny-library.json', data: sample },
+        ],
         errors: [],
       });
     } finally {
@@ -307,6 +383,11 @@ describe('Place files on disk', () => {
         id: (await realpath(broken)).replaceAll('\\', '/'),
       });
       expect(await server.environments.ssr.transformRequest('/places/tiny-library.json')).toEqual(
+        expect.objectContaining({ code: expect.stringContaining('Tiny Library') }),
+      );
+      // Saved as "UTF-8 with BOM", as some Windows editors do: Vite loads it like any other.
+      await writeFile(join(root, 'places', 'bom-house.json'), `\uFEFF${JSON.stringify(sample)}`);
+      expect(await server.environments.ssr.transformRequest('/places/bom-house.json')).toEqual(
         expect.objectContaining({ code: expect.stringContaining('Tiny Library') }),
       );
     } finally {

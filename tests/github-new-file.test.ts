@@ -209,6 +209,19 @@ describe('Starting a house on GitHub', () => {
     }
   });
 
+  it('hands every house in town to GitHub whole, by link or by copy and paste', () => {
+    // In one link when it fits, by copy and paste when GitHub could not take it (a long sign, deep
+    // indents or Hebrew grow it past the limit). A contributor's long sign is theirs to keep, so
+    // neither way fails their pull request.
+    for (const place of places) {
+      const url = newHouseFileUrl(REPOSITORY, place);
+      expect(readLink(url).value, place.id).toBe(houseFile(place));
+      expect(houseFileLink(REPOSITORY, place), place.id).toBe(
+        url.length <= HOUSE_LINK_LIMIT ? url : null,
+      );
+    }
+  });
+
   it('fits a sign that uses all its characters in one link', () => {
     // The longest artwork a sign may have: a title and 2,000 characters of styled spans.
     const span =

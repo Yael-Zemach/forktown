@@ -8,6 +8,7 @@ import {
   DEFAULT_DESIGN,
   DEFAULT_RESIDENT,
   draftSchema,
+  openPlotsNear,
   placeSchema,
   residentSchema,
 } from '../src/lib/schema';
@@ -57,8 +58,10 @@ describe('Restoring a builder draft', () => {
     const taken = new Set(['C6', 'D4', 'E5']);
     const available = HOUSE_PLOTS.filter((plot) => !taken.has(plot.id));
     expect(restoreDraftPlot(available[3].id, available)).toBe(available[3].id);
-    expect(restoreDraftPlot(FORK_PLOT, available)).toBe(available[0].id);
-    expect(restoreDraftPlot('C6', available)).toBe(available[0].id);
+    // It stays in the part of town it chose: the nearest open plot, as a plot clash suggests.
+    for (const plot of [FORK_PLOT, 'C6', 'R1', 'A9', 'D14', 'T15'])
+      expect(restoreDraftPlot(plot, available), plot).toBe(openPlotsNear(plot, taken, 1)[0]);
+    expect(restoreDraftPlot('Z99', available)).toBe(available[0].id);
     expect(restoreDraftPlot('C6', [])).toBe('A1');
   });
 

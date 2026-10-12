@@ -27,8 +27,8 @@ about once or twice through before the next takes over:
 | 22:15 | Porch Lights            | The night theme                                                   |
 
 The stage's shows play over them: a rock, acoustic or jazz concert from 19:00 to 21:00, and
-**One More Little Dance**, a 112 BPM midnight disco, from 23:30 to 02:30. When the clock
-reaches the next tune, the one playing finishes its
+**One More Little Dance**, a 112 BPM midnight disco, from 23:30 to 02:30. So does a Bandstand
+set, near the stand (below). When the clock reaches the next tune, the one playing finishes its
 phrase of four bars first, fading over its last moment, and the next comes in where it ends:
 no melody is cut off mid-line (`player.ts`). The next tune is rendered half a minute ahead, so
 its turn starts on time. Keys and tempos are chosen so neighbours meet well: the waltz in B♭
@@ -83,6 +83,17 @@ catch silence and clipping; they do not replace listening.
 For future music contributions, start with a score change and audition it there. Keep a tune
 a whole number of four-bar phrases long, leave space in the melody, and test the loop and mix
 levels. Do not add someone else's songs or recordings without an appropriate license.
+
+# The Bandstand
+
+The Bandstand's three bands each play an arrangement of their own, in
+`src/music/bandstand-tracks.ts`: the brass "Oom-pah on the Lawn", the folk "The Riverbank Reel"
+and the strings "Deckchairs at Dusk". See [The Bandstand](BANDSTAND.md).
+The music is local, like the cinema's: a live set plays only while the camera is near
+the Bandstand, louder as it zooms in and panned by where the stand sits on screen.
+It plays over the town's own tune, which eases down as the band comes up (the cinema's
+curve) and comes back up, never restarted, when the set ends or the camera leaves: a band
+heard faintly from afar never leaves the town near silent. A live stage show plays first. See [Town events](TOWN_EVENTS.md#bandstand-evenings).
 
 # Football sounds
 
